@@ -13,6 +13,9 @@
     const auctions = writable(null);
     const groupedBids = writable(null); // Add a new store for grouped bids
 
+    // Won auctions store
+    const wonAuctions = writable(null);
+
     // Function to get the authentication token from localStorage
     const getToken = () => localStorage.getItem('token');
 
@@ -97,6 +100,16 @@
             } else {
                 console.error('Unexpected data structure:', bidsData);
             }
+
+            // Fetch won auctions separately
+            const wonAuctionsResponse = await fetch(`${API_BASE_URL}/user/won-auctions/${userId}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'token': getToken(),
+                },
+            });
+            const wonAuctionsData = await wonAuctionsResponse.json();
+            wonAuctions.set(wonAuctionsData);
         } catch (error) {
             console.error('Error fetching user details, bids, and auction details:', error);
         }
@@ -218,6 +231,7 @@
     $: console.log('Bids store content:', $bids);
     $: console.log('Auctions store content:', $auctions);
     $: console.log('Grouped bids content:', $groupedBids);
+    $: console.log('Won auctions:', $wonAuctions);
 </script>
 
 <main>
@@ -229,7 +243,19 @@
             <!-- Add other user details as needed -->
         </section>
     {/if}
-
+    {#if $wonAuctions && $wonAuctions.length > 0}
+        <section>
+            <h2>Won Auctions</h2>
+            {#each $wonAuctions as { auctionId, victor, bid, dateTimeString }}
+                <div class="won-auction-container">
+                    <p>Auction ID: {auctionId}</p>
+                    <p>Winner: {victor}</p>
+                    <p>Winning Bid: {bid}</p>
+                    <p>Winning Date: {formatDate(dateTimeString)}</p>
+                </div>
+            {/each}
+        </section>
+    {/if}
     {#if $groupedBids}
         <section>
             <h2>Bid History</h2>
@@ -254,7 +280,8 @@
         </section>
     {/if}
 
-    {#if !$userDetails && !$groupedBids}
+
+    {#if !$userDetails && !$groupedBids && !($wonAuctions && $wonAuctions.length > 0)}
         <p>Loading...</p>
     {/if}
 </main>
@@ -284,6 +311,17 @@
         border-top: 1px solid #ddd;
         margin-top: 10px;
         padding-top: 10px;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 10px;
     }
 
     a {

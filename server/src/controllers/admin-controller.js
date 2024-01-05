@@ -30,6 +30,9 @@ export const endAuction = async (req, res) => {
         console.log("Updating auction status to 'ended'. Auction ID:", auctionId);
         await db.closeAuction(auctionId, "ended");
 
+        // Log the updated auction status after closing
+        console.log(await db.getAuctionById(auctionId));
+
         // Send a response indicating success
         const successResponse = { message: `Auction ${auctionId} ended successfully.` };
         console.log(`Auction ${auctionId} ended successfully.`);

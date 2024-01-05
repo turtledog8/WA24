@@ -1,9 +1,18 @@
 import bcrypt from "bcrypt";
 
-
-
 const users = [];
 const auctions = [];
+
+export async function getWonAuctions(userId) {
+    const user = getUserDetails(userId);
+
+    if (user && user.wonAuctions) {
+        return user.wonAuctions;
+    } else {
+        console.log(`User not found or no won auctions for user ID: ${userId}`);
+        return null;
+    }
+}
 
 
 export async function addUser(firstName, lastName, username, email, password) {
@@ -18,7 +27,8 @@ export async function addUser(firstName, lastName, username, email, password) {
         username,
         email,
         password: hashedPassword,
-        isAdmin: false
+        isAdmin: false,
+        wonAuctions: [], // I want the winning bids stored here
     };
 
     // Add user to "database"
@@ -27,7 +37,6 @@ export async function addUser(firstName, lastName, username, email, password) {
 export function getUserDetails(id) {
     return users.find((user) => user.id === Number(id));
 }
-
 
 export async function addAdmin(firstName, lastName, username, email, password) {
     // Hash and salt the password
@@ -41,7 +50,7 @@ export async function addAdmin(firstName, lastName, username, email, password) {
         username,
         email,
         password: hashedPassword,
-        isAdmin: true
+        isAdmin: true,
     };
 
     // Add user to "database"
@@ -66,9 +75,11 @@ export async function getUserBids(username) {
         console.log(auctions[i].bids);
         console.log(auctions[i].bids);
 
-        // Push each bid individually
+        // Push each bid individually if the username matches
         for (const bid of auctions[i].bids) {
-            bids.push(bid);
+            if (bid.username === username) {
+                bids.push(bid);
+            }
         }
     }
     console.log("Final bids array:", bids);
@@ -76,7 +87,7 @@ export async function getUserBids(username) {
 }
 
 
-function setClosingTime(){
+function setClosingTime() {
     const today = new Date();
     const closingTime = new Date(today);
     closingTime.setDate(closingTime.getDate() + 1); // 24 hours from now
@@ -85,14 +96,12 @@ function setClosingTime(){
 export async function addAuction(auction) {
     auction.id = auctions.length;
     auction.bids = [];
-    auction.closingTime = setClosingTime(); // closing time is set to default 24h
     auction.status = "open"; // Add a status field with the initial value "open"
+    console.log(auction.status);
+    auction.closingTime = setClosingTime(); // closing time is set to default 24h
     auctions.push(auction);
     console.log(auction.closingTime);
 }
-
-
-
 
 export async function deleteAuction(auctionId) {
     // Convert the auctionId to a number (assuming the ID in the auctions array is a number)
@@ -117,7 +126,6 @@ export async function deleteAuction(auctionId) {
     // Return false if the auction was not found
     return false;
 }
-// In database.js
 
 export async function editAuction(auctionId, newAuction) {
     try {
@@ -132,13 +140,13 @@ export async function editAuction(auctionId, newAuction) {
                 images: newAuction.images || existingAuction.images,
                 tags: {
                     ...existingAuction.tags,
-                    ...newAuction.tags
+                    ...newAuction.tags,
                 },
                 bids: existingAuction.bids,
                 closingTime: newAuction.closingTime || existingAuction.closingTime,
                 timeRemaining: newAuction.closingTime
                     ? newAuction.closingTime - new Date()
-                    : existingAuction.timeRemaining
+                    : existingAuction.timeRemaining,
             };
 
             // Log the existing and updated auctions for debugging
@@ -169,9 +177,6 @@ export async function editAuction(auctionId, newAuction) {
     }
 }
 
-
-
-
 export async function getAllAuctions() {
     return auctions;
 }
@@ -197,12 +202,17 @@ export function checkAuctionIdExists(auctionId) {
 
     return false;
 }
-
 export async function removeBid(username, auctionId, bidDateTimeString) {
     try {
         const auction = await getAuctionById(auctionId);
 
         if (auction && auction.bids) {
+            // Check if the auction status is "ended"
+            if (auction.status === "ended") {
+                console.log(`Bid removal is disabled for ended Auction ${auctionId}`);
+                return false; // Return false if bid removal is disabled
+            }
+
             const bidIndex = auction.bids.findIndex(
                 (bid) =>
                     bid.username === username &&
@@ -213,7 +223,7 @@ export async function removeBid(username, auctionId, bidDateTimeString) {
                 username,
                 auctionId,
                 bidDateTimeString,
-                auctionBids: auction.bids
+                auctionBids: auction.bids,
             });
 
             if (bidIndex !== -1) {
@@ -236,18 +246,17 @@ export async function removeBid(username, auctionId, bidDateTimeString) {
         throw error; // Propagate the error to handle it at a higher level
     }
 }
-/////////////////////////////////////////////////////
 
 export async function getHighestBid(auctionId) {
-    let highestBid = 0;
+    let highestBid = { bid: 0, username: null, dateTimeString: null };
 
     try {
         const auction = await getAuctionById(auctionId);
 
         if (auction && auction.bids) {
             auction.bids.forEach((bid) => {
-                if (bid.bid > highestBid) {
-                    highestBid = bid.bid;
+                if (bid.bid > highestBid.bid) {
+                    highestBid = bid;
                 }
             });
         }
@@ -259,7 +268,51 @@ export async function getHighestBid(auctionId) {
     }
 }
 
-// Other functions...
+
+export async function addAuctionBid(username, auctionId, bid) {
+    let auction;
+
+    for (let i = 0; i < auctions.length; i++) {
+        if (auctions[i].id === auctionId) {
+            auction = auctions[i];
+        }
+    }
+
+    if (auction) {
+        if (!auction.bids) {
+            auction.bids = [];
+        }
+
+        // Check if bid addition is disabled
+        if (auction.status === "ended") {
+            console.log(`Bid addition is disabled for Auction ${auctionId}`);
+            return false; // Return false if bid addition is disabled
+        }
+
+        const currentDateTime = ((d) => `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()} ${d.getHours()}:${d.getMinutes()} `)(new Date());
+
+        const data = {
+            "bid": bid,
+            "username": username, // Add userId to the bid object
+            "dateTimeString": currentDateTime,
+            "auction": auction.id,
+        }
+
+        // Use the user as the key and bid as the value in the map
+        auction.bids.push(data);
+
+        // Include closingTime property in the auction data structure
+        if (!auction.closingTime) {
+            // Set a default closing time (you can set it according to your requirements)
+            auction.closingTime = new Date();
+            auction.closingTime.setMinutes(auction.closingTime.getMinutes() + 30); // 30 minutes from now
+        }
+
+        return true; // Return true if the bid was added successfully
+    }
+
+    return false; // Return false if the auction was not found.
+}
 
 export function updateAuctionClosingTimes() {
     const currentTime = new Date();
@@ -279,16 +332,50 @@ export function updateAuctionClosingTimes() {
     }
 }
 
-
-
-function determineWinner(auctionId) {
+async function determineWinner(auctionId) {
     try {
-        const { highestBid, winningUsername } = getHighestBid(auctionId);
+        // Use await to get the result of the Promise returned by getHighestBid
+        const highestBid = await getHighestBid(auctionId);
 
-        if (highestBid > 0) {
-            console.log(`Winner of Auction ${auctionId}: ${winningUsername} with a bid of €${highestBid}`);
-            // Perform any necessary actions for the winner
-            // For example, notify the winner, update the database, etc.
+        console.log(`Highest Bid for Auction ${auctionId}:`, highestBid);
+
+        // Check if highestBid is truthy and bid is greater than 0
+        if (highestBid && highestBid.bid > 0) {
+            console.log(`Winner of Auction ${auctionId}: ${highestBid.username} with a bid of €${highestBid.bid}`);
+
+            // Find the user by username or email using findUser function
+            const winner = findUser(highestBid.username);
+
+            if (winner) {
+                // Ensure wonAuctions is initialized as an array
+                winner.wonAuctions = winner.wonAuctions || [];
+
+                // Check if the won auction already exists
+                const existingWonAuction = winner.wonAuctions.find(wonAuction => wonAuction.auctionId === auctionId);
+
+                if (!existingWonAuction) {
+                    // Store the won auction details (including the winning bid)
+                    const wonAuction = {
+                        auctionId,
+                        victor: highestBid.username, // Assuming the auction object has an 'item' property
+                        bid: highestBid.bid,
+                        dateTimeString: highestBid.dateTimeString,
+                    };
+
+                    // Add the won auction object to the user's wonAuctions array
+                    winner.wonAuctions.push(wonAuction);
+
+                    // Log the details of the winning user and their won auctions
+                    console.log("Won Auctions: ", winner.wonAuctions);
+
+                    // Perform any necessary actions for the winner
+                    // For example, notify the winner, update the database, etc.
+                } else {
+                    console.log(`Won auction for Auction ${auctionId} already exists for user ${highestBid.username}.`);
+                }
+            } else {
+                console.log(`User ${highestBid.username} not found.`);
+            }
         } else {
             console.log(`No bids found for Auction ${auctionId}.`);
         }
@@ -300,70 +387,35 @@ function determineWinner(auctionId) {
 
 
 
-export async function addAuctionBid(username, auctionId, bid) {
-    let auction;
-
-    for (let i = 0; i < auctions.length; i++) {
-        if (auctions[i].id === auctionId) {
-            auction = auctions[i];
-        }
-    }
-
-    if (auction) {
-        if (!auction.bids) {
-            auction.bids = [];
-        }
-        const currentDateTime = ((d) => `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()} ${d.getHours()}:${d.getMinutes()} `)(new Date());
-
-        const data = {
-            "bid": bid,
-            "username": username,
-            "dateTimeString": currentDateTime,
-            "auction" : auction.id,
-        }
-
-        // Use the user as the key and bid as the value in the map
-        auction.bids.push(data);
-
-        // Include closingTime property in the auction data structure
-        if (!auction.closingTime) {
-            // Set a default closing time (you can set it according to your requirements)
-            auction.closingTime = new Date();
-            auction.closingTime.setMinutes(auction.closingTime.getMinutes() + 30); // 30 minutes from now
-        }
-
-        return true; // Return true if the bid was added successfully
-    }
-
-    return false; // Return false if the auction was not found.
-}
-
-
-
-
-
-
 
 
 export async function closeAuction(auctionId) {
     console.log(`Closing Auction ${auctionId}...`);
 
-    const auctionIndex = auctions.findIndex((auction) => auction.id === auctionId);
+    const auction = await getAuctionById(auctionId);
 
-    if (auctionIndex !== -1) {
-        // Mark the auction as closed
-        auctions[auctionIndex].status = 'closed'; // Set the status to closed
-        auctions[auctionIndex].timeRemaining = 0; // Set remaining time to 0
+    if (auction) {
+        // Log the auction before making changes
+        console.log('Before Closing:', auction);
+
+        // Mark the auction as ended
+        auction.status = 'ended'; // Change the status to 'ended'
+        auction.closingTime = new Date(); // Set closing time to the current time
+        auction.timeRemaining = 0; // Set remaining time to 0
         console.log(`Auction ${auctionId} closed.`);
 
-        // Determine the winner if there are bids
-        determineWinner(auctionId);
+        // Log the entire auction object and its properties after making changes
+        console.log('Status After Closing:', auction.status);
+        console.log('Closing Time After Closing:', auction.closingTime);
 
-        // Log the entire auction object and its properties
-        console.log("Closed Auction:", auctions[auctionIndex]);
+        // Log bids before determining the winner
+        console.log('Bids before determining winner:', auction.bids);
+
+        // Determine the winner if there are bids
+        await determineWinner(auctionId);
+
+        console.log('Updated Auction Status:', auction.status); // Log the status after changes
     } else {
         console.log(`Auction not found with ID: ${auctionId}`);
     }
 }
-
-

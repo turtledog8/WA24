@@ -1,5 +1,23 @@
 import * as db from "../data/database.js";
 
+export const getWonAuctionsForUser = async (req, res) => {
+    const userId = req.params.id;
+
+    try {
+        const wonAuctions = await db.getWonAuctions(userId);
+
+        if (wonAuctions) {
+            res.status(200).json(wonAuctions);
+        } else {
+            res.status(404).json({ message: "No won auctions found for the user" });
+        }
+    } catch (error) {
+        console.error("Error fetching won auctions for user:", userId, "\nError:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
 export const removeUserBid = async (req, res) => {
     const username = req.body.username;
     const auctionId = req.body.auctionId;
@@ -20,7 +38,7 @@ export const removeUserBid = async (req, res) => {
 };
 
 export const getUserDetails = async (req, res) => {
-    const userId = req.params.id; // Assuming the user ID is passed as a parameter in the request URL
+    const userId = req.params.id; //  the user ID is passed as a parameter in the request URL
 
     try {
         const userDetails = db.getUserDetails(parseInt(userId)); // Parse the userId to an integer before passing it to the function
@@ -132,28 +150,27 @@ const getHighestBid = async (auctionId) => {
 };
 
 export const getBidsForUser = async (req, res) => {
-    const id = req.params.id
+    const userId = req.params.id; // Assuming the user ID is in the request parameters
+
     try {
-        const user = db.getUserDetails(id);
-        console.log(user);
-        const bids = await db.getUserBids(user);
+        // Fetch user details based on user ID
+        const userDetails = await db.getUserDetails(userId);
 
-        const jsonObject = {
-            message: "Successfully retrieved bids",
-            bids: bids
+        if (userDetails) {
+            const bids = await db.getUserBids(userDetails.username); // Assuming username is used to fetch bids
+
+            const jsonObject = {
+                message: "Successfully retrieved bids",
+                bids: bids
+            };
+
+            res.status(200).json(jsonObject);
+        } else {
+            // User not found
+            res.status(404).json({ message: "User not found" });
         }
-
-        res
-            .status(200)
-            .json(jsonObject);
-    } catch (Error) {
-        console.error("Error getting bids for user: " + id)
-
-        res
-            .status(500)
-            .json({ message: "An internal server error occurred" })
+    } catch (error) {
+        console.error("Error getting bids for user:", userId);
+        res.status(500).json({ message: "An internal server error occurred" });
     }
-
-
-
-}
+};

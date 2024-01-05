@@ -7,16 +7,16 @@
     export let isLoggedIn = false;
     export let bid = 1.00;
     export let errorMessage = "";
-    export let countdown = { days: 0, hours: 0, minutes: 0, seconds: 0 }; // Initialize countdown timer
-    export let isAdmin = false; // Add isAdmin variable for checking admin status
+    export let countdown = { days: 0, hours: 0, minutes: 0, seconds: 0 };
+    export let isAdmin = false;
 
     const findHighestBid = () => {
         if (auction && auction.bids && auction.bids.length > 0) {
             const bidEntries = Object.entries(auction.bids);
-            bidEntries.sort((a, b) => b[1] - a[1]); // Sort by bid values in descending order
-            return bidEntries[0]; // Get the last (highest) bid
+            bidEntries.sort((a, b) => b[1] - a[1]);
+            return bidEntries[0];
         } else {
-            return [null, 0]; // Return a default value when there are no bids
+            return [null, 0];
         }
     };
 
@@ -31,10 +31,8 @@
             const decodedToken = JSON.parse(atob(token.split('.')[1]));
             const currentTimestamp = Math.floor(Date.now() / 1000);
 
-            // Check if the token has not expired
             return !(decodedToken.exp && decodedToken.exp < currentTimestamp);
         } catch (error) {
-            // If there is an error decoding or parsing the token, it's not valid
             return false;
         }
     }
@@ -66,7 +64,6 @@
     export const submitBid = async () => {
         console.log("Submitting bid:", bid);
 
-        // Check if the user is authenticated
         if (!isLoggedIn) {
             errorMessage = "Please log in to place a bid.";
             return;
@@ -86,7 +83,6 @@
 
         const jwt = localStorage.getItem("token");
 
-        // Check if the token is available
         if (!jwt) {
             errorMessage = "Authentication token missing. Please log in again.";
             return;
@@ -95,7 +91,7 @@
         const user = JSON.parse(atob(jwt.split('.')[1]));
 
         const data = {
-            "user": user, // Add user information to the data
+            "user": user,
             "auctionId": auction.id,
             "bid": numericBid,
         }
@@ -123,7 +119,6 @@
         }
     }
 
-
     onMount(async () => {
         isLoggedIn = isJwtValid();
         try {
@@ -132,13 +127,10 @@
             });
             if (response.ok) {
                 auction = await response.json();
-
-                // Transform bids array here
                 auction.bids = auction.bids.map(bid => ({
                     user: { username: bid.user ? bid.user.username : 'Unknown' },
                     bid: bid
                 }));
-
             } else {
                 console.error("Error fetching data:", response.status, response.statusText);
             }
@@ -151,19 +143,20 @@
             bid = highestBid[1];
         }
 
-        // Check if the user is an admin
         const token = localStorage.getItem('token');
         const decodedToken = decodeJWT(token);
         isAdmin = decodedToken && decodedToken.isAdmin;
 
-        countdown = calculateRemainingTime(); // Initialize countdown on component mount
+        // Use the closing time directly from the auction object
+        const closingTime = new Date(auction.closingTime);
+        countdown = calculateRemainingTime(closingTime);
 
         const interval = setInterval(() => {
-            countdown = calculateRemainingTime(); // Update countdown every second
+            countdown = calculateRemainingTime(closingTime);
         }, 1000);
 
         onDestroy(() => {
-            clearInterval(interval); // Clear the interval on component destruction
+            clearInterval(interval);
         });
     });
 
@@ -188,7 +181,6 @@
             console.log("ending auction response:", response);
 
             if (response.ok) {
-                // Redirect or perform any necessary action after successful deletion
                 console.log("Auction ended successfully");
 
             } else {
@@ -218,7 +210,6 @@
             console.log("Delete auction response:", response);
 
             if (response.ok) {
-                // Redirect or perform any necessary action after successful deletion
                 console.log("Auction deleted successfully");
                 window.location.href = "/store";
             } else {
@@ -232,7 +223,6 @@
     };
 
     const editAuction = async () => {
-
         try {
             console.log("Editing auction:", auction.id);
             window.location.href = `/edit-auction/${auction.id}`;
@@ -243,85 +233,82 @@
 
     export { editAuction };
 </script>
-
-    <main>
-        {#if auction === null}
-            <p>Loading...</p>
-        {:else}
-            {#if auction.images && Array.isArray(auction.images)}
-                <div class="left-field">
-                    <div class="image-container">
-                        <div class="image-nav left" on:click={() => navigateTo(currentImageIndex - 1)}>&#9664;</div>
-                        <img src={auction.images[currentImageIndex]} alt="Auction Image" />
-                        <div class="image-nav right" on:click={() => navigateTo(currentImageIndex + 1)}>&#9654;</div>
-                        <div class="image-pagination">
-                            {#each auction.images as image, index (image)}
-                                <div class="pagination-dot {index === currentImageIndex ? 'active' : ''}" on:click={() => navigateTo(index)}></div>
-                            {/each}
-                        </div>
+<main>
+    {#if auction === null}
+        <p>Loading...</p>
+    {:else}
+        {#if auction.images && Array.isArray(auction.images)}
+            <div class="left-field">
+                <div class="image-container">
+                    <div class="image-nav left" on:click={() => navigateTo(currentImageIndex - 1)}>&#9664;</div>
+                    <img src={auction.images[currentImageIndex]} alt="Auction Image" />
+                    <div class="image-nav right" on:click={() => navigateTo(currentImageIndex + 1)}>&#9654;</div>
+                    <div class="image-pagination">
+                        {#each auction.images as image, index (image)}
+                            <div class="pagination-dot {index === currentImageIndex ? 'active' : ''}" on:click={() => navigateTo(index)}></div>
+                        {/each}
                     </div>
-                    <div class="info-section">
-                        <h1>{auction.item}</h1>
-                        {#if auction.tags}
-                            <div class="tags">
-                                {#if typeof auction.tags === 'object'}
-                                    {#each Object.entries(auction.tags) as [tag, value]}
-                                        <div class="tag-box">
-                                            <p><strong>{tag}:</strong> {value}</p>
-                                        </div>
-                                    {/each}
-                                {:else if Array.isArray(auction.tags)}
-                                    {#each auction.tags as tag, index}
-                                        <div class="tag-box">
-                                            <p><strong>{index}:</strong> {tag}</p>
-                                        </div>
-                                    {/each}
-                                {/if}
-                            </div>
-                        {/if}
-
-                    </div>
-                    {#if isAdmin}
-                        <div class="info-section">
-                            <button on:click={editAuction}>Edit Auction</button>
-                            <button on:click={deleteAuction}>Delete Auction</button>
-                            <button on:click={endAuction}>End Auction</button>
-
+                </div>
+                <div class="info-section">
+                    <h1>{auction.item}</h1>
+                    {#if auction.tags}
+                        <div class="tags">
+                            {#if typeof auction.tags === 'object'}
+                                {#each Object.entries(auction.tags) as [tag, value]}
+                                    <div class="tag-box">
+                                        <p><strong>{tag}:</strong> {value}</p>
+                                    </div>
+                                {/each}
+                            {:else if Array.isArray(auction.tags)}
+                                {#each auction.tags as tag, index}
+                                    <div class="tag-box">
+                                        <p><strong>{index}:</strong> {tag}</p>
+                                    </div>
+                                {/each}
+                            {/if}
                         </div>
                     {/if}
-
                 </div>
-            {/if}
-            <div class="middle-field">
-                <div class="info-container">
-                    <div class="middle-section">
-                        <h1>Description</h1>
-                        <p class="description">{auction.description}</p>
+                {#if isAdmin}
+                    <div class="info-section">
+                        <button on:click={editAuction}>Edit Auction</button>
+                        <button on:click={deleteAuction}>Delete Auction</button>
+                        <button on:click={endAuction}>End Auction</button>
                     </div>
+                {/if}
+            </div>
+        {/if}
+        <div class="middle-field">
+            <div class="info-container">
+                <div class="middle-section">
+                    <h1>Description</h1>
+                    <p class="description">{auction.description}</p>
                 </div>
             </div>
-            <div class="right-field">
-                <div class="info-section">
-                    <h2>Bids</h2>
-                    <div class="bids-container">
-                        <ul>
-                            {#if auction.bids.length > 0}
-                                {#each auction.bids.slice().reverse() as { bid }, index}
-                                    <li>
-                                        <p> {bid.username.username}</p>
-                                        <p>€{bid.bid}</p> <!-- Prepend euro sign here -->
-                                        {#if index !== auction.bids.length - 1}
-                                            <hr class="bid-divider" />
-                                        {/if}
-                                    </li>
-                                {/each}
-                            {:else}
-                                <p>No bids yet.</p>
-                            {/if}
-                        </ul>
-                    </div>
+        </div>
+        <div class="right-field">
+            <div class="info-section">
+                <h2>Bids</h2>
+                <div class="bids-container">
+                    <ul>
+                        {#if auction.bids.length > 0}
+                            {#each auction.bids.slice().reverse() as { bid }, index}
+                                <li>
+                                    <p> {bid.username}</p>
+                                    <p>€{bid.bid}</p>
+                                    {#if index !== auction.bids.length - 1}
+                                        <hr class="bid-divider" />
+                                    {/if}
+                                </li>
+                            {/each}
+                        {:else}
+                            <p>No bids yet.</p>
+                        {/if}
+                    </ul>
                 </div>
-                <div class="info-section">
+            </div>
+            <div class="info-section">
+                {#if auction.status !== 'ended'}
                     {#if countdown.days > 0}
                         <p>Time Remaining: {countdown.days} days, {countdown.hours} hours, {countdown.minutes} minutes, {countdown.seconds} seconds</p>
                     {:else if countdown.hours > 0}
@@ -331,27 +318,32 @@
                     {:else}
                         <p>Time Remaining: {countdown.seconds} seconds</p>
                     {/if}
+                {/if}
 
-                    {#if isLoggedIn}
-                        <div class="error-message">
-                            {#if errorMessage}
-                                {errorMessage}
-                            {/if}
-                        </div>
+                {#if isLoggedIn}
+                    <div class="error-message">
+                        {#if errorMessage}
+                            {errorMessage}
+                        {/if}
+                    </div>
 
-                        <label for="bid">Your Bid (in euros):</label>
-                        <input type="number" step="1" bind:value={bid} placeholder="Enter your bid in euros (e.g., 50.00)" id="bid"/>
+                    <label for="bid">Your Bid (in euros):</label>
+                    <input type="number" step="1" bind:value={bid} placeholder="Enter your bid in euros (e.g., 50.00)" id="bid"/>
+                    {#if auction.status !== 'ended'}
                         <div class="submit-button-container">
                             <button class="submit-button" on:click={submitBid}>Submit Bid</button>
                         </div>
-
-                    {:else}
-                        <p><a href="/login">Log in</a> or <a href="/register">register</a> to place a bid.</p>
                     {/if}
-                </div>
+
+                {:else}
+                    <p><a href="/login">Log in</a> or <a href="/register">register</a> to place a bid.</p>
+                {/if}
             </div>
-        {/if}
-    </main>
+        </div>
+    {/if}
+</main>
+
+
 
     <style>
         main {

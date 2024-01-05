@@ -12,8 +12,11 @@ const authenticationMiddleware = (req, res, next) => {
 router.use('/', authenticationMiddleware);
 
 router.post('/bid', controller.placeBid);
-router.post('/bid/remove', controller.removeUserBid); // Updated endpoint
+router.post('/bid/remove', controller.removeUserBid);
 router.get('/bids/:id', controller.getBidsForUser);
 router.get('/profile/:id', controller.getUserDetails);
+
+// New route for fetching won auctions
+router.get('/won-auctions/:id', controller.getWonAuctionsForUser);
 
 export default router;
