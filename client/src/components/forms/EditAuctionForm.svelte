@@ -5,7 +5,7 @@
 
     let auction = null;
     let errorMessage = "";
-    let tagsInputValue = ""; // Separate variable for the input field
+    let tagsInputValue = "";
 
     const fetchData = async () => {
         try {
@@ -15,7 +15,7 @@
 
             if (response.ok) {
                 auction = await response.json();
-                // Initialize the input field value with the JSON string
+
                 tagsInputValue = JSON.stringify(auction.tags);
             } else {
                 console.error("Error fetching data:", response.status, response.statusText);
@@ -36,7 +36,7 @@
             item: auction.item,
             description: auction.description,
             images: auction.images,
-            tags: JSON.parse(tagsInputValue) // Parse the JSON string back to an array
+            tags: JSON.parse(tagsInputValue)
         };
 
         try {
@@ -54,9 +54,9 @@
             if (response.ok) {
                 const updatedAuction = await response.json();
                 console.log("Updated Auction:", updatedAuction.newAuction);
-                // Update local auction data directly
+
                 auction = updatedAuction.newAuction;
-                // You might want to show a success message to the user
+
             } else {
                 console.error("Error submitting edit:", response.status, response.statusText);
                 const responseBody = await response.text();
@@ -100,7 +100,6 @@
 </main>
 
 <style>
-    /* Add your styling here */
     main {
         max-width: 600px;
         margin: 20px auto;
